@@ -84,12 +84,13 @@ struct ColorDepthOption
 Size              GameSize;
 DisplayResolution GameResolution;
 
+const int MaxSidebordersWidth = 110;
 int debug_15bit_mode = 0, debug_24bit_mode = 0;
 int convert_16bit_bgr = 0;
 
 int adjust_pixel_size_for_loaded_data(int size, int filever)
 {
-    if (filever < kGameVersion_300)
+    if (filever < kGameVersion_310)
     {
         return multiply_up_coordinate(size);
     }
@@ -162,7 +163,6 @@ void adjust_sizes_for_resolution(int filever)
 
 int engine_init_gfx_filters(int color_depth);
 bool find_nearest_supported_mode(Size &wanted_size, const int color_depth, const Size *ratio_reference = NULL, bool ignore_given_size = false);
-void pre_create_gfx_driver(GFXFilter *set_filter);
 
 bool get_desktop_size_for_windowed_mode(Size &size)
 {
@@ -239,7 +239,6 @@ void apply_window_aspect_ratio(Size &screen_size, int color_depth)
 int engine_init_screen_settings(Size &screen_size, Placement &drawing_place, ColorDepthOption &color_depths)
 {
     Out::FPrint("Initializing screen settings");
-    pre_create_gfx_driver(NULL);
 
     // default shifts for how we store the sprite data
 
@@ -376,7 +375,7 @@ int initialize_graphics_filter(const char *filterID, const int colDepth)
     int idx = 0;
     GFXFilter **filterList;
 
-    if (stricmp(usetup.gfxDriverID, "D3D9") == 0)
+    if (usetup.gfxDriverID.CompareNoCase("D3D9") == 0)
     {
         filterList = get_d3d_gfx_filter_list(false);
     }
@@ -410,27 +409,43 @@ int initialize_graphics_filter(const char *filterID, const int colDepth)
         return -1;
     }
 
+    gfxDriver->SetGraphicsFilter(gfxFilter);
     return 0;
 }
 
-void pre_create_gfx_driver(GFXFilter *set_filter) 
+void pre_create_gfx_driver(const String &gfx_driver_id)
 {
 #ifdef WINDOWS_VERSION
-    if (stricmp(usetup.gfxDriverID, "D3D9") == 0)
-        gfxDriver = GetD3DGraphicsDriver(set_filter);
+    if (gfx_driver_id.CompareNoCase("D3D9") == 0 && (game.color_depth != 1))
+    {
+        gfxDriver = GetD3DGraphicsDriver(NULL);
+        if (!gfxDriver)
+        {
+            Out::FPrint("Failed to initialize D3D9 driver: %s", get_allegro_error());
+        }
+    }
     else
 #endif
+#if defined (IOS_VERSION) || defined(ANDROID_VERSION) || defined(WINDOWS_VERSION)
+    if (gfx_driver_id.CompareNoCase("DX5") != 0 && (psp_gfx_renderer > 0) && (game.color_depth != 1))
     {
-#if defined(IOS_VERSION) || defined(ANDROID_VERSION) || defined(WINDOWS_VERSION)
-        if ((psp_gfx_renderer > 0) && (game.color_depth != 1))
-            gfxDriver = GetOGLGraphicsDriver(set_filter);
-        else
-#endif
-            gfxDriver = GetSoftwareGraphicsDriver(set_filter);
+        gfxDriver = GetOGLGraphicsDriver(NULL);
+        if (!gfxDriver)
+        {
+            Out::FPrint("Failed to initialize OGL driver: %s", get_allegro_error());
+        }
     }
+#endif
+
+    if (!gfxDriver)
+    {
+        gfxDriver = GetSoftwareGraphicsDriver(NULL);
+    }
+
+    Out::FPrint("Created graphics driver: %s", gfxDriver->GetDriverName());
 }
 
-int find_max_supported_uniform_multiplier(const Size &base_size, const int color_depth)
+int find_max_supported_uniform_multiplier(const Size &base_size, const int color_depth, int width_range_allowed)
 {
     IGfxModeList *modes = gfxDriver->GetSupportedModeList(color_depth);
     if (!modes)
@@ -453,12 +468,14 @@ int find_max_supported_uniform_multiplier(const Size &base_size, const int color
             continue;
         }
 
-        if (mode.Width > base_size.Width && mode.Width % base_size.Width == 0 &&
+        if (mode.Width > base_size.Width &&
             mode.Height > base_size.Height && mode.Height % base_size.Height == 0)
         {
             int multiplier_x = mode.Width / base_size.Width;
+            int remainder_x = mode.Width % base_size.Width;
             int multiplier_y = mode.Height / base_size.Height;
-            if (multiplier_x == multiplier_y && multiplier_x > least_supported_multiplier)
+            if (multiplier_x == multiplier_y && (remainder_x / multiplier_x <= width_range_allowed) &&
+                multiplier_x > least_supported_multiplier)
             {
                 least_supported_multiplier = multiplier_x;
             }
@@ -483,7 +500,7 @@ String get_maximal_supported_scaling_filter(int color_depth)
     // fullscreen mode
     if (usetup.windowed == 0)
     {
-        int selected_scaling = find_max_supported_uniform_multiplier(GameSize, color_depth);
+        int selected_scaling = find_max_supported_uniform_multiplier(GameSize, color_depth, MaxSidebordersWidth);
         if (selected_scaling > 1)
         {
             selected_scaling = Math::Min(selected_scaling, max_scaling);
@@ -519,7 +536,7 @@ int engine_init_gfx_filters(int color_depth)
     if (force_gfxfilter[0]) {
         gfxfilter = force_gfxfilter;
     }
-    else if (usetup.gfxFilterID && stricmp(usetup.gfxFilterID, "Max") != 0) {
+    else if (!usetup.gfxFilterID.IsEmpty() && stricmp(usetup.gfxFilterID, "max") != 0) {
         gfxfilter = usetup.gfxFilterID;
     }
 #if defined (WINDOWS_VERSION) || defined (LINUX_VERSION)
@@ -533,13 +550,14 @@ int engine_init_gfx_filters(int color_depth)
     {
         return EXIT_NORMAL;
     }
-
     return RETURN_CONTINUE;
 }
 
-void create_gfx_driver() 
+void create_gfx_driver(const String &gfx_driver_id)
 {
-    pre_create_gfx_driver(gfxFilter);
+    Out::FPrint("Init gfx driver");
+    pre_create_gfx_driver(gfx_driver_id);
+    usetup.gfxDriverID = gfxDriver->GetDriverID();
 
     gfxDriver->SetCallbackOnInit(GfxDriverOnInitCallback);
     gfxDriver->SetTintMethod(TintReColourise);
@@ -724,33 +742,14 @@ bool switch_to_graphics_mode(const Size init_screen_size, const Placement drawin
     return success;
 }
 
-void engine_init_gfx_driver()
-{
-    Out::FPrint("Init gfx driver");
-
-    create_gfx_driver();
-}
-
 int engine_init_graphics_mode(const Size screen_size, const Placement drawing_place, const ColorDepthOption color_depths)
 {
     Out::FPrint("Switching to graphics mode");
 
     if (!switch_to_graphics_mode(screen_size, drawing_place, color_depths))
     {
-        proper_exit=1;
-        platform->FinishedUsingGraphicsMode();
-
-        platform->DisplayAlert("There was a problem initializing graphics mode %d x %d (%d-bit).\n"
-            "(Problem: '%s')\n"
-            "Try to correct the problem, or seek help from the AGS homepage.\n"
-            "\nPossible causes:\n* your graphics card drivers do not support this resolution. "
-            "Run the game setup program and try the other resolution.\n"
-            "* the graphics driver you have selected does not work. Try changing graphics driver.\n"
-            "* the graphics filter you have selected does not work. Try another filter.",
-            screen_size.Width, screen_size.Height, color_depths.First, allegro_error);
         return EXIT_NORMAL;
     }
-
     return RETURN_CONTINUE;
 }
 
@@ -876,21 +875,56 @@ void engine_set_color_conversions()
     set_color_conversion(COLORCONV_MOST | COLORCONV_EXPAND_256 | COLORCONV_REDUCE_16_TO_15);
 }
 
-int graphics_mode_init()
+int create_gfx_driver_and_init_mode(const String &gfx_driver_id, Size &screen_size, ColorDepthOption &color_depths)
 {
-    Size screen_size;
     Placement drawing_place;
-    ColorDepthOption color_depths;
 
+    create_gfx_driver(gfx_driver_id);
     int res = engine_init_screen_settings(screen_size, drawing_place, color_depths);
     if (res != RETURN_CONTINUE)
     {
         return res;
     }
-    engine_init_gfx_driver();
     res = engine_init_graphics_mode(screen_size, drawing_place, color_depths);
     if (res != RETURN_CONTINUE)
     {
+        return res;
+    }
+    return RETURN_CONTINUE;
+}
+
+void display_gfx_mode_error(const Size screen_size, const ColorDepthOption color_depths)
+{
+    proper_exit=1;
+    platform->FinishedUsingGraphicsMode();
+
+    platform->DisplayAlert("There was a problem initializing graphics mode %d x %d (%d-bit).\n"
+        "(Problem: '%s')\n"
+        "Try to correct the problem, or seek help from the AGS homepage.\n"
+        "\nPossible causes:\n* your graphics card drivers do not support this resolution. "
+        "Run the game setup program and try the other resolution.\n"
+        "* the graphics driver you have selected does not work. Try changing graphics driver.\n"
+        "* the graphics filter you have selected does not work. Try another filter.",
+        screen_size.Width, screen_size.Height, color_depths.First, get_allegro_error());
+}
+
+int graphics_mode_init()
+{
+    Size screen_size;
+    ColorDepthOption color_depths;
+
+    int res = create_gfx_driver_and_init_mode(usetup.gfxDriverID, screen_size, color_depths);
+    if (res != RETURN_CONTINUE)
+    {
+        if (gfxDriver && stricmp(gfxDriver->GetDriverID(), "DX5") != 0)
+        {
+            graphics_mode_shutdown();
+            res = create_gfx_driver_and_init_mode("DX5", screen_size, color_depths);
+        }
+    }
+    if (res != RETURN_CONTINUE)
+    {
+        display_gfx_mode_error(screen_size, color_depths);
         return res;
     }
 
@@ -900,4 +934,22 @@ int graphics_mode_init()
     engine_set_gfx_driver_callbacks();
     engine_set_color_conversions();
     return RETURN_CONTINUE;
+}
+
+void graphics_mode_shutdown()
+{
+    // Release the display mode (and anything dependant on the window)
+    if (gfxDriver != NULL)
+    {
+        gfxDriver->UnInit();
+    }
+
+    // Tell Allegro that we are no longer in graphics mode
+    set_gfx_mode(GFX_TEXT, 0, 0, 0, 0);
+
+    delete gfxDriver;
+    gfxDriver = NULL;
+
+    delete gfxFilter;
+    gfxFilter = NULL;
 }

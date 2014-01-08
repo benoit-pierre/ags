@@ -175,6 +175,7 @@ public:
 
   virtual const char*GetDriverName() { return "Allegro/DX5"; }
   virtual const char*GetDriverID() { return "DX5"; }
+  virtual void SetGraphicsFilter(GFXFilter *filter);
   virtual DisplayResolution GetResolution();
   virtual bool IsWindowed();
   virtual Rect GetDrawingFrame();
@@ -326,6 +327,11 @@ int ALSoftwareGraphicsDriver::GetAllegroGfxDriverID(bool windowed)
     return GFX_AUTODETECT_WINDOWED;
   return GFX_AUTODETECT_FULLSCREEN;
 #endif
+}
+
+void ALSoftwareGraphicsDriver::SetGraphicsFilter(GFXFilter *filter)
+{
+  _filter = (AllegroGFXFilter*)filter;
 }
 
 void ALSoftwareGraphicsDriver::SetTintMethod(TintMethod method) 
@@ -813,7 +819,6 @@ bool ALSoftwareGraphicsDriver::PlayVideo(const char *filename, bool useAVISound,
   int result = dxmedia_play_video(filename, useAVISound, skipType, stretchToFullScreen ? 1 : 0);
   return (result == 0);
 #else
-#warning ffmpeg implementation needed
   return 0;
 #endif
 }

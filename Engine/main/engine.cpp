@@ -388,31 +388,29 @@ int engine_init_game_data(int argc,char*argv[])
         char emsg[STD_BUFFER_SIZE];
         if (errcod==Common::kAssetErrNoLibFile)
         {  // file not found
-            sprintf(emsg,
-                "You must create and save a game first in the AGS Editor before you can use "
-                "this engine.\n\n"
-                "If you have just downloaded AGS, you are probably running the wrong executable.\n"
-                "Run AGSEditor.exe to launch the editor.\n\n");
-            int len = strlen(emsg);
             if (game_file_name.IsEmpty())
             {
-                sprintf(emsg + len, "(Unable to find game data file in any of the known locations.)\n");
+                sprintf(emsg, "ERROR: Unable to find game data files\n\n");
             }
             else
             {
-                sprintf(emsg + len, "(Unable to find or open '%s'.)\n", game_file_name.GetCStr());
+                sprintf(emsg, "ERROR: Unable to find or open '%s'.\n\n", game_file_name.GetCStr());
             }
         }
         else if (errcod==Common::kAssetErrLibAssetCount)
         {
-            sprintf(emsg, "ERROR: Too many files in data file.\n\n%s\n", game_file_name.GetCStr());
+            sprintf(emsg, "ERROR: Too many files in data file.\n\n%s\n\n", game_file_name.GetCStr());
         }
         else
         {
             sprintf(emsg, "ERROR: The file is corrupt. Make sure you have the correct version of the "
-                "editor, and that this really is an AGS game.\n\n%s\n", game_file_name.GetCStr());
+                "editor, and that this really is an AGS game.\n\n%s\n\n", game_file_name.GetCStr());
         }
+
         platform->DisplayAlert(emsg);
+
+        main_print_help();
+
         return EXIT_NORMAL;
     }
 
@@ -680,7 +678,7 @@ void atexit_handler() {
             "Program pointer: %+03d  (write this number down), ACI version %s\n"
             "If you see a list of numbers above, please write them down and contact\n"
             "Chris Jones. Otherwise, note down any other information displayed.\n",
-            EngineVersion.LongString.GetCStr(), our_eip);
+            our_eip, EngineVersion.LongString.GetCStr());
         platform->DisplayAlert(pexbuf);
     }
 
@@ -1196,7 +1194,7 @@ void init_game_settings() {
         last_sound_played[ee] = -1;
 
     if (usetup.translation)
-        init_translation (usetup.translation);
+        init_translation (usetup.translation, "", true);
 
     update_invorder();
     displayed_room = -10;
@@ -1220,7 +1218,14 @@ void engine_init_game_shit()
     scsystem.viewport_height = divide_down_coordinate(GameSize.Height);
     // ScriptSystem::aci_version is only 10 chars long
     strncpy(scsystem.aci_version, EngineVersion.LongString, 10);
-    scsystem.os = platform->GetSystemOSID();
+    if (usetup.override_script_os >= 0)
+    {
+        scsystem.os = usetup.override_script_os;
+    }
+    else
+    {
+        scsystem.os = platform->GetSystemOSID();
+    }
 
     if (usetup.windowed)
         scsystem.windowed = 1;
@@ -1242,9 +1247,9 @@ void engine_init_game_shit()
     gfxDriver->SetRenderOffset(get_screen_x_adjustment(virtual_screen), get_screen_y_adjustment(virtual_screen));
 }
 
-void update_mp3_thread()
+void engine_update_mp3_thread()
 {
-  UPDATE_MP3_THREAD
+  update_mp3_thread();
   platform->Delay(50);
 }
 
@@ -1256,7 +1261,7 @@ void engine_start_multithreaded_audio()
   // Create sound update thread. This is a workaround for sound stuttering.
   if (psp_audio_multithreaded)
   {
-    if (!audioThread.CreateAndStart(update_mp3_thread, true))
+    if (!audioThread.CreateAndStart(engine_update_mp3_thread, true))
     {
       Out::FPrint("Failed to start audio thread, audio will be processed on the main thread");
       psp_audio_multithreaded = 0;
@@ -1300,6 +1305,8 @@ int initialize_engine(int argc,char*argv[])
     int res;
 
     engine_read_config(argc, argv);
+    apply_output_configuration();
+
     res = engine_init_allegro();
     if (res != RETURN_CONTINUE) {
         return res;

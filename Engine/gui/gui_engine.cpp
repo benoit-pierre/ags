@@ -18,6 +18,7 @@
 
 // Headers, as they are in acgui.cpp
 #pragma unmanaged
+#include "ac/game_version.h"
 #include "font/fonts.h"
 #include "gui/guimain.h"
 #include "gui/guibutton.h"
@@ -30,6 +31,7 @@
 #include "ac/string.h"
 #include "ac/spritecache.h"
 #include "gfx/bitmap.h"
+#include "gfx/blender.h"
 #include "main/graphics_mode.h"
 
 using AGS::Common::Bitmap;
@@ -58,7 +60,11 @@ bool GUIMain::is_alpha()
     return false;
   }
   // transparent background, enable alpha blending
-  return (GameResolution.ColorDepth >= 24);
+  return GameResolution.ColorDepth >= 24 &&
+        // transparent background have alpha channel only since 3.2.0;
+        // "classic" gui rendering mode historically had non-alpha transparent backgrounds
+        // (3.2.0 broke the compatibility, now we restore it)
+        loaded_game_file_version >= kGameVersion_320 && game.options[OPT_NEWGUIALPHA] != kGuiAlphaRender_Classic;
 }
 
 int GUIObject::IsClickable()

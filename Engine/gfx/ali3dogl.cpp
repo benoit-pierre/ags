@@ -384,6 +384,7 @@ class OGLGraphicsDriver : public IGraphicsDriver
 public:
   virtual const char*GetDriverName() { return "OpenGL"; }
   virtual const char*GetDriverID() { return "OGL"; }
+  virtual void SetGraphicsFilter(GFXFilter *filter);
   virtual DisplayResolution GetResolution();
   virtual bool IsWindowed();
   virtual Rect GetDrawingFrame();
@@ -586,6 +587,11 @@ void OGLGraphicsDriver::SetRenderOffset(int x, int y)
 {
   _global_x_offset = x;
   _global_y_offset = y;
+}
+
+void OGLGraphicsDriver::SetGraphicsFilter(GFXFilter *filter)
+{
+  _filter = (D3DGFXFilter*)filter;
 }
 
 void OGLGraphicsDriver::SetTintMethod(TintMethod method) 

@@ -31,11 +31,9 @@ enum RenderFramePlacement
 };
 
 int graphics_mode_init();
+void graphics_mode_shutdown();
 
 extern Size GameSize;
 extern AGS::Engine::DisplayResolution GameResolution;
-
-extern int debug_15bit_mode, debug_24bit_mode;
-extern int convert_16bit_bgr;
 
 #endif // __AGS_EE_MAIN__GRAPHICSMODE_H

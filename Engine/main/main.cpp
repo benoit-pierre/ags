@@ -121,7 +121,7 @@ void main_create_platform_driver()
 #define ACI_VERSION_MAJOR               3
 #define ACI_VERSION_MINOR               3
 #define ACI_VERSION_RELEASE             0
-#define ACI_VERSION_REVISION            1148
+#define ACI_VERSION_REVISION            1152
 #ifdef NO_MP3_PLAYER
 #define SPECIAL_VERSION "NMP"
 #else
@@ -181,14 +181,23 @@ extern char return_to_roomedit[30];
 extern char return_to_room[150];
 
 void main_print_help() {
-    printf("\nUsage: ags [<options>] [<gamefile or directory>]\n\n"
+    printf("Usage: ags [OPTIONS] [GAMEFILE or DIRECTORY]\n\n"
            "Options:\n"
-           "-windowed            Set display mode to windowed\n"
-           "-fullscreen          Set display mode to fullscreen\n"
-           "-hicolor             Enable 16bit colors\n"
-           "-gfxfilter <filter>  Enable graphics filter, where <filter> can be\n"
-           "                     StdScale2, StdScale3, StdScale4, Hq2x or Hq3x\n"
-           "--help               Print this help message\n");
+           "  --windowed                   Force display mode to windowed\n"
+           "  --fullscreen                 Force display mode to fullscreen\n"
+           "  --hicolor                    Downmix 32bit colors to 16bit\n"
+           "  --gfxfilter <filter>         Enable graphics filter. Available options:\n"
+           "                                 StdScale2, StdScale3, StdScale4, Hq2x or Hq3x\n"
+           "  --log                        Enable program output to the log file\n"
+           "  --no-log                     Disable program output to the log file,\n"
+           "                                 overriding configuration file setting\n"
+           "  --help                       Print this help message\n"
+           "\n"
+           "Gamefile options:\n"
+           "  /dir/path/game/              Launch the game in specified directory\n"
+           "  /dir/path/game/penguin.exe   Launch penguin.exe\n"
+           "  [nothing]                    Launch the game in the current directory\n"
+    );
 }
 
 int main_process_cmdline(int argc,char*argv[])
@@ -203,17 +212,17 @@ int main_process_cmdline(int argc,char*argv[])
             change_to_game_dir = 1;
         else if (stricmp(argv[ee],"-updatereg") == 0)
             debug_flags |= DBG_REGONLY;
-        else if (stricmp(argv[ee],"-windowed") == 0)
+        else if (stricmp(argv[ee],"-windowed") == 0 || stricmp(argv[ee],"--windowed") == 0)
             force_window = 1;
-        else if (stricmp(argv[ee],"-fullscreen") == 0)
+        else if (stricmp(argv[ee],"-fullscreen") == 0 || stricmp(argv[ee],"--fullscreen") == 0)
             force_window = 2;
-        else if (stricmp(argv[ee],"-hicolor") == 0)
+        else if (stricmp(argv[ee],"-hicolor") == 0 || stricmp(argv[ee],"--hicolor") == 0)
             force_16bit = 1;
         else if (stricmp(argv[ee],"-record") == 0)
             play.recording = 1;
         else if (stricmp(argv[ee],"-playback") == 0)
             play.playback = 1;
-        else if ((stricmp(argv[ee],"-gfxfilter") == 0) && (argc > ee + 1))
+        else if ((stricmp(argv[ee],"-gfxfilter") == 0 || stricmp(argv[ee],"--gfxfilter") == 0) && (argc > ee + 1))
         {
             strncpy(force_gfxfilter, argv[ee + 1], 49);
             ee++;
@@ -270,6 +279,14 @@ int main_process_cmdline(int argc,char*argv[])
             strncpy (play.takeover_from, argv[ee + 2], 49);
             play.takeover_from[49] = 0;
             ee += 2;
+        }
+        else if (stricmp(argv[ee], "--log") == 0)
+        {
+            enable_log_file = true;
+        }
+        else if (stricmp(argv[ee], "--no-log") == 0)
+        {
+            disable_log_file = true;
         }
         else if (argv[ee][0]!='-') datafile_argv=ee;
     }
@@ -361,7 +378,7 @@ String GetPathFromCmdArg(int arg_index)
     LPCWSTR arg_path = wArgv[arg_index];
     if (GetShortPathNameW(arg_path, short_path, MAX_PATH) == 0)
     {
-        platform->DisplayAlert("Unable to determine path: GetShortPathNameW failed.\nCommand line argument %i: %s", arg_index, global_argv[arg_index]);
+        Out::FPrint("Unable to determine path: GetShortPathNameW failed.\nCommand line argument %i: %s", arg_index, global_argv[arg_index]);
         return "";
     }
     WideCharToMultiByte(CP_ACP, 0, short_path, -1, ansi_buffer, MAX_PATH, NULL, NULL);
@@ -436,7 +453,7 @@ int main(int argc,char*argv[]) {
         return 0;
     }
 
-    Out::FPrint("***** ENGINE STARTUP");
+    Out::FPrint("*** ENGINE STARTUP ***");
 
 #if defined(WINDOWS_VERSION)
     _set_new_handler(malloc_fail_handler);

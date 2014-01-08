@@ -34,11 +34,14 @@ struct GameSetup {
     AGS::Common::String data_files_dir;
     AGS::Common::String main_data_filename;
     char *translation;
-    char *gfxFilterID;
-    char *gfxDriverID;
+    AGS::Common::String gfxFilterID;
+    AGS::Common::String gfxDriverID;
     Size  screen_size;
     RenderFramePlacement drawing_place;
     char match_desktop_ratio;
+    int   override_script_os;
+    char  override_multitasking;
+
     GameSetup();
 };
 

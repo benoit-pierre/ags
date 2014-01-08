@@ -29,10 +29,12 @@
 #include "gfx/ddb.h"
 #include "gfx/graphicsdriver.h"
 #include "main/main_allegro.h"
+#include "util/library.h"
 #include "util/string.h"
 
 using AGS::Common::Bitmap;
 using AGS::Common::String;
+using AGS::Engine::Library;
 namespace BitmapHelper = AGS::Common::BitmapHelper;
 using namespace AGS; // FIXME later
 
@@ -282,6 +284,7 @@ class D3DGraphicsDriver : public IGraphicsDriver
 public:
   virtual const char*GetDriverName() { return "Direct3D 9"; }
   virtual const char*GetDriverID() { return "D3D9"; }
+  virtual void SetGraphicsFilter(GFXFilter *filter);
   virtual DisplayResolution GetResolution();
   virtual bool IsWindowed();
   virtual Rect GetDrawingFrame();
@@ -322,6 +325,8 @@ public:
   virtual void SetMemoryBackBuffer(Bitmap *backBuffer) {  }
   virtual void SetScreenTint(int red, int green, int blue);
 
+  bool CreateDriver();
+
   // Internal
   int _initDLLCallback();
   int _resetDeviceIfNecessary();
@@ -333,7 +338,6 @@ public:
   D3DGFXFilter *_filter;
 
 private:
-  HMODULE d3dlib;
   D3DPRESENT_PARAMETERS d3dpp;
   IDirect3D9* direct3d;
   IDirect3DDevice9* direct3ddevice;
@@ -371,6 +375,8 @@ private:
   int numToDrawLastTime;
   GlobalFlipType flipTypeLastTime;
 
+  LONG _allegroOriginalWindowStyle;
+
   bool EnsureDirect3D9IsCreated();
   void initD3DDLL();
   void InitializeD3DState();
@@ -387,6 +393,22 @@ private:
 
 static int wnd_create_device();
 static D3DGraphicsDriver *_d3d_driver = NULL;
+//
+// IMPORTANT NOTE: since the Direct3d9 device is created with
+// D3DCREATE_MULTITHREADED behavior flag, once it is created the d3d9.dll may
+// only be unloaded after window is destroyed, as noted in the MSDN's article
+// on "D3DCREATE"
+// (http://msdn.microsoft.com/en-us/library/windows/desktop/bb172527.aspx).
+// Otherwise window becomes either destroyed prematurely or broken (details
+// are unclear), which causes errors during Allegro deinitialization.
+//
+// Curiously, this problem was only confirmed under WinXP so far.
+//
+// For the purpose of avoiding this problem, we have a global library wrapper
+// that unloads library only at the very program exit (except cases of device
+// creation failure).
+// 
+static Library D3D9Library;
 
 IGraphicsDriver* GetD3DGraphicsDriver(GFXFilter *filter)
 {
@@ -400,12 +422,16 @@ IGraphicsDriver* GetD3DGraphicsDriver(GFXFilter *filter)
     _d3d_driver->_filter = d3dfilter;
   }
 
+  if (!_d3d_driver->CreateDriver())
+  {
+      delete _d3d_driver;
+      return NULL;
+  }
   return _d3d_driver;
 }
 
 D3DGraphicsDriver::D3DGraphicsDriver(D3DGFXFilter *filter) 
 {
-  d3dlib = NULL;
   direct3d = NULL;
   direct3ddevice = NULL;
   vertexbuffer = NULL;
@@ -429,6 +455,7 @@ D3DGraphicsDriver::D3DGraphicsDriver(D3DGFXFilter *filter)
   _screenTintSprite.y = 0;
   pixelShader = NULL;
   _legacyPixelShader = false;
+  _allegroOriginalWindowStyle = 0;
   set_up_default_vertices();
 }
 
@@ -472,6 +499,11 @@ void D3DGraphicsDriver::set_up_default_vertices()
   defaultVertices[3].tv=1.0;
 }
 
+bool D3DGraphicsDriver::CreateDriver()
+{
+   return EnsureDirect3D9IsCreated();
+}
+
 void D3DGraphicsDriver::Vsync() 
 {
   // do nothing on D3D
@@ -484,26 +516,23 @@ bool D3DGraphicsDriver::EnsureDirect3D9IsCreated()
 
    IDirect3D9 * (WINAPI * lpDirect3DCreate9)(UINT);
 
-   d3dlib = LoadLibrary("d3d9.dll");
-   if (d3dlib == NULL) 
+   if (!D3D9Library.Load("d3d9"))
    {
      set_allegro_error("Direct3D is not installed");
      return false;
    }
 
-   lpDirect3DCreate9 = (IDirect3D9 * (WINAPI *)(UINT))GetProcAddress(d3dlib, "Direct3DCreate9");
+   lpDirect3DCreate9 = (IDirect3D9 * (WINAPI *)(UINT))D3D9Library.GetFunctionAddress("Direct3DCreate9");
    if (lpDirect3DCreate9 == NULL) 
    {
-     FreeLibrary(d3dlib);
-     d3dlib = NULL;
+     D3D9Library.Unload();
      set_allegro_error("Entry point not found in d3d9.dll");
      return false;
    }
 
    direct3d = lpDirect3DCreate9( D3D_SDK_VERSION );
    if (direct3d == NULL) {
-     FreeLibrary(d3dlib);
-     d3dlib = NULL;
+     D3D9Library.Unload();
      set_allegro_error("Direct3DCreate failed!");
      return false;
    }
@@ -530,8 +559,7 @@ void D3DGraphicsDriver::initD3DDLL()
      _exit_critical();
      direct3d->Release();
      direct3d = NULL;
-     FreeLibrary(d3dlib);
-     d3dlib = NULL;
+     D3D9Library.Unload();
      throw Ali3DException(get_allegro_error());
    }
 
@@ -764,6 +792,10 @@ int D3DGraphicsDriver::_initDLLCallback()
   {
     // Remove the border in full-screen mode, otherwise if the player
     // clicks near the edge of the screen it goes back to Windows
+    if (_allegroOriginalWindowStyle == 0)
+    {
+      _allegroOriginalWindowStyle = GetWindowLong(allegro_wnd, GWL_STYLE);
+    }
     LONG windowStyle = WS_POPUP;
     SetWindowLong(allegro_wnd, GWL_STYLE, windowStyle);
   }
@@ -1012,6 +1044,11 @@ void D3DGraphicsDriver::SetRenderOffset(int x, int y)
   _global_y_offset = y;
 }
 
+void D3DGraphicsDriver::SetGraphicsFilter(GFXFilter *filter)
+{
+  _filter = (D3DGFXFilter*)filter;
+}
+
 void D3DGraphicsDriver::SetTintMethod(TintMethod method) 
 {
   _legacyPixelShader = (method == TintReColourise);
@@ -1104,6 +1141,16 @@ void D3DGraphicsDriver::UnInit()
     direct3ddevice->Release();
     direct3ddevice = NULL;
   }
+
+  if (_allegroOriginalWindowStyle != 0)
+  {
+    HWND allegro_wnd = win_get_window();
+    if (allegro_wnd)
+    {
+      SetWindowLong(allegro_wnd, GWL_STYLE, _allegroOriginalWindowStyle);
+    }
+    _allegroOriginalWindowStyle = 0;
+  }
 }
 
 D3DGraphicsDriver::~D3DGraphicsDriver()
@@ -1114,12 +1161,6 @@ D3DGraphicsDriver::~D3DGraphicsDriver()
   {
     direct3d->Release();
     direct3d = NULL;
-  }
-
-  if (d3dlib) 
-  {
-    FreeLibrary(d3dlib);
-    d3dlib = NULL;
   }
 }
 

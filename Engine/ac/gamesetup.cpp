@@ -27,7 +27,5 @@ GameSetup::GameSetup()
     disable_exception_handling = 0;
     base_width = 320;
     base_height = 200;
-    gfxFilterID = NULL;
-    gfxDriverID = NULL;
     drawing_place = kRenderPlaceResizeWindow;
 }

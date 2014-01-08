@@ -77,7 +77,7 @@ void script_debug(int cmdd,int dataa) {
         sprintf(toDisplay,"Adventure Game Studio run-time engine[ACI version %s"
             "[Game resolution %d x %d"
             "[Running %d x %d at %d-bit%s%s[GFX: %s[%sDraw frame %d x %d["
-            "Sprite cache size: %ld KB (limit %ld KB; %ld locked)",
+            "Sprite cache size: %d KB (limit %d KB; %d locked)",
             EngineVersion.LongString.GetCStr(), GameSize.Width, GameSize.Height,
             disp_res.Width, disp_res.Height, disp_res.ColorDepth, (convert_16bit_bgr) ? " BGR" : "",
             gfxDriver->IsWindowed() ? " W" : "",

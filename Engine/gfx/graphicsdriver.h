@@ -32,6 +32,7 @@ namespace Engine
 
 // Forward declaration
 class IDriverDependantBitmap;
+class GFXFilter;
 
 enum GlobalFlipType
 {
@@ -64,6 +65,7 @@ class IGraphicsDriver
 public:
   virtual const char*GetDriverName() = 0;
   virtual const char*GetDriverID() = 0;
+  virtual void SetGraphicsFilter(GFXFilter *filter) = 0;
   virtual DisplayResolution GetResolution() = 0;
   virtual bool IsWindowed() = 0;
   virtual Rect GetDrawingFrame() = 0;
