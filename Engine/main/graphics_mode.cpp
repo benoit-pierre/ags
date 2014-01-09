@@ -84,7 +84,6 @@ struct ColorDepthOption
 Size              GameSize;
 DisplayResolution GameResolution;
 
-const int MaxSidebordersWidth = 110;
 int debug_15bit_mode = 0, debug_24bit_mode = 0;
 int convert_16bit_bgr = 0;
 
@@ -445,17 +444,18 @@ void pre_create_gfx_driver(const String &gfx_driver_id)
     Out::FPrint("Created graphics driver: %s", gfxDriver->GetDriverName());
 }
 
-int find_max_supported_uniform_multiplier(const Size &base_size, const int color_depth, int width_range_allowed)
+bool find_max_supported_mode(Size &max_size, const int color_depth)
 {
     IGfxModeList *modes = gfxDriver->GetSupportedModeList(color_depth);
     if (!modes)
     {
         Out::FPrint("Couldn't get a list of supported resolutions");
-        return 0;
+        return false;
     }
 
-    int least_supported_multiplier = 0;
-    int mode_count = modes->GetModeCount();
+    int max_width = 0;
+    int max_height = 0;
+    const int mode_count = modes->GetModeCount();
     DisplayResolution mode;
     for (int i = 0; i < mode_count; ++i)
     {
@@ -468,43 +468,34 @@ int find_max_supported_uniform_multiplier(const Size &base_size, const int color
             continue;
         }
 
-        if (mode.Width > base_size.Width &&
-            mode.Height > base_size.Height && mode.Height % base_size.Height == 0)
+        if (mode.Width >= max_width && mode.Height >= max_height)
         {
-            int multiplier_x = mode.Width / base_size.Width;
-            int remainder_x = mode.Width % base_size.Width;
-            int multiplier_y = mode.Height / base_size.Height;
-            if (multiplier_x == multiplier_y && (remainder_x / multiplier_x <= width_range_allowed) &&
-                multiplier_x > least_supported_multiplier)
-            {
-                least_supported_multiplier = multiplier_x;
-            }
+            max_width = mode.Width;
+            max_height = mode.Height;
         }
     }
 
     delete modes;
-
-    if (least_supported_multiplier == 0)
+    if (max_width > 0 && max_height > 0)
     {
-        Out::FPrint("Couldn't find acceptable supported resolution");
+        max_size.Width = max_width;
+        max_size.Height = max_height;
+        return true;
     }
-    return least_supported_multiplier;
+    Out::FPrint("Couldn't find acceptable supported resolution");
+    return false;
 }
 
-String get_maximal_supported_scaling_filter(int color_depth)
+void set_maximal_supported_screen_size(const int color_depth)
 {
-    Out::FPrint("Detecting maximal supported scaling");
-    String gfxfilter = "None";
+    Out::FPrint("Detecting maximal supported screen size");
 
-    const int max_scaling = 8; // we support up to x8 scaling now
     // fullscreen mode
     if (usetup.windowed == 0)
     {
-        int selected_scaling = find_max_supported_uniform_multiplier(GameSize, color_depth, MaxSidebordersWidth);
-        if (selected_scaling > 1)
+        if (find_max_supported_mode(usetup.screen_size, color_depth))
         {
-            selected_scaling = Math::Min(selected_scaling, max_scaling);
-            gfxfilter.Format("StdScale%d", selected_scaling);
+            usetup.drawing_place = kRenderPlaceStretchProportional;
         }
     }
     // windowed mode
@@ -514,17 +505,18 @@ String get_maximal_supported_scaling_filter(int color_depth)
         Size desktop_size;
         if (get_desktop_size_for_windowed_mode(desktop_size))
         {
-            int xratio = desktop_size.Width / GameSize.Width;
-            int yratio = desktop_size.Height / GameSize.Height;
-            int selected_scaling = Math::Min(Math::Min(xratio, yratio), max_scaling);
-            gfxfilter.Format("StdScale%d", selected_scaling);
+            // We do not need black borders here
+            const int xratio = (desktop_size.Width << 10) / GameSize.Width;
+            const int yratio = (desktop_size.Height << 10) / GameSize.Height;
+            const int uniform_ratio = Math::Min(xratio, yratio);
+            usetup.screen_size = (GameSize * uniform_ratio) >> 10;
+            usetup.drawing_place = kRenderPlaceStretchProportional;
         }
         else
         {
-            Out::FPrint("Automatic scaling failed (unable to obtain desktop resolution)");
+            Out::FPrint("Automatic sizing failed (unable to obtain desktop resolution)");
         }
     }
-    return gfxfilter;
 }
 
 int engine_init_gfx_filters(int color_depth)
@@ -542,7 +534,7 @@ int engine_init_gfx_filters(int color_depth)
 #if defined (WINDOWS_VERSION) || defined (LINUX_VERSION)
     else
     {
-        gfxfilter = get_maximal_supported_scaling_filter(color_depth);
+        set_maximal_supported_screen_size(color_depth);
     }
 #endif
 

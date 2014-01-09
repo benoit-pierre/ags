@@ -111,14 +111,34 @@ struct Size
         Height = Math::Min(size.Height, Height);
     }
 
-    inline bool operator==(const Size size) const
+    inline bool operator ==(const Size size) const
     {
         return Width == size.Width && Height == size.Height;
     }
 
-    inline bool operator!=(const Size size) const
+    inline bool operator !=(const Size size) const
     {
         return Width != size.Width || Height != size.Height;
+    }
+
+    inline Size operator *(int x) const
+    {
+        return Size(Width * x, Height * x);
+    }
+
+    inline Size operator /(int x) const
+    {
+        return Size(Width / x, Height / x);
+    }
+
+    inline Size operator <<(int x) const
+    {
+        return Size(Width << x, Height << x);
+    }
+
+    inline Size operator >>(int x) const
+    {
+        return Size(Width >> x, Height >> x);
     }
 };
 
