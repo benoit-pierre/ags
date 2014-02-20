@@ -1,6 +1,6 @@
 #!/bin/sh
 
-if test -z $(which wx-config)
+if test -z $(which wx-config-2.8)
   then
     echo "No wx-config found, install wxWidgets development files, on Debian/Ubuntu: libwxbase2.8-dev or libwxgtk2.8-dev"
     exit 2

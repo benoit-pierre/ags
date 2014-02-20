@@ -1,7 +1,7 @@
 # makefile
 
-CXXFLAGS = `wx-config --cxxflags`
-LDFLAGS = `wx-config --libs`
+CXXFLAGS := `wx-config-2.8 --cxxflags`
+LDFLAGS := `wx-config-2.8 --libs`
 
 PROGRAM = tex2rtf
 
