@@ -901,6 +901,11 @@ void update_polled_audio_and_crossfade ()
 
 	AGS::Engine::MutexLock _lock(_audio_mutex);
 
+    if ((debug_flags & DBG_NOMUSIC))
+    {
+        stopmusic();
+    }
+
     _audio_doing_crossfade = true;
 
     audio_update_polled_stuff();
