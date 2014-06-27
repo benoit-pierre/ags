@@ -60,6 +60,10 @@
 #include "main/game_file.h"
 #include "debug/out.h"
 
+#if defined (LINUX_VERSION)
+# include <xalleg.h>
+#endif
+
 using AGS::Common::String;
 using AGS::Common::Stream;
 using AGS::Common::Bitmap;
@@ -127,6 +131,22 @@ int errno;
 #define myerrno errno
 #endif
 
+#ifdef ALLEGRO_WITH_XWINDOWS
+
+// Weaken reference to XQLength so we don't have to explicitly link with X11.
+extern int XQLength(Display *) __attribute__((weak));
+
+static void _input_handler(void)
+{
+    if (0 == _xwin.display)
+      return;
+
+    while (XQLength(_xwin.display) > 0)
+        _xwin_private_handle_input();
+}
+
+#endif
+
 int engine_init_allegro()
 {
     Out::FPrint("Initializing allegro");
@@ -142,6 +162,13 @@ int engine_init_allegro()
 #endif
         return EXIT_NORMAL;
     }
+
+#ifdef ALLEGRO_WITH_XWINDOWS
+    if (NULL != &XQLength)
+    {
+        _xwin_input_handler = _input_handler;
+    }
+#endif
 
     return RETURN_CONTINUE;
 }
