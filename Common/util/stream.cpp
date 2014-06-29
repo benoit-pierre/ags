@@ -26,7 +26,7 @@ size_t Stream::ReadArrayOfIntPtr32(intptr_t *buffer, size_t count)
     {
         for (size_t i = 0; i < count; ++i)
         {
-            buffer[i] = buf_ptr[i];
+            buffer[i] = ((uint32_t *)buf_ptr)[i];
         }
         delete [] buf_ptr;
     }
