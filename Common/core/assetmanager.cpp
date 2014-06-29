@@ -525,7 +525,7 @@ AssetError AssetManager::ReadSingleFileAssetLib(MultiFileLib * mfl, Stream *ci_s
 {
     int passwmodifier = ci_s->ReadByte();
     ci_s->ReadInt8(); // unused byte
-    mfl->num_data_files = 1;
+    mfl->num_data_files = 0;
     mfl->num_files = ci_s->ReadInt16();
     if (mfl->num_files > MAX_FILES)
     {
