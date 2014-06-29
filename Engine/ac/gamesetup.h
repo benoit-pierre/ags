@@ -29,6 +29,7 @@ struct GameSetup {
     int mp3_player;
     bool want_letterbox; // defines whether game is displayed in letterboxed mode
     bool windowed;
+    int background_run;
     int base_width;
     int base_height;
     short refresh;

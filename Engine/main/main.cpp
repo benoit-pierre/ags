@@ -83,7 +83,7 @@ extern char editor_debugger_instance_token[100];
 
 // Startup flags, set from parameters to engine
 char force_gfxfilter[50];
-int datafile_argv=0, change_to_game_dir = 0, force_window = 0;
+int datafile_argv=0, change_to_game_dir = 0, force_window = 0, force_background_run = 0;
 int override_start_room = 0, force_16bit = 0;
 bool justRunSetup = false;
 bool justRegisterGame = false;
@@ -179,6 +179,8 @@ void main_print_help() {
            "  --letterbox                  Enable letterbox mode\n"
            "  --gfxfilter <filter>         Enable graphics filter. Available options:\n"
            "                                 StdScale2, StdScale3, StdScale4, Hq2x or Hq3x\n"
+           "  --background-run             Keep running in the background when loosing focus\n"
+           "                                 (Only applicable when not running fullscreen)\n"
            "  --log                        Enable program output to the log file\n"
            "  --no-log                     Disable program output to the log file,\n"
            "                                 overriding configuration file setting\n"
@@ -211,6 +213,8 @@ int main_process_cmdline(int argc,char*argv[])
             force_16bit = 1;
         else if (stricmp(argv[ee],"-letterbox") == 0 || stricmp(argv[ee],"--letterbox") == 0)
             usetup.prefer_letterbox = 1;
+        else if (stricmp(argv[ee],"-background-run") == 0 || stricmp(argv[ee],"--background-run") == 0)
+            force_background_run = 1;
         else if (stricmp(argv[ee],"-record") == 0)
             play.recording = 1;
         else if (stricmp(argv[ee],"-playback") == 0)

@@ -42,7 +42,7 @@ extern char **global_argv;
 AGS::Common::String GetPathFromCmdArg(int arg_index);
 
 // Startup flags, set from parameters to engine
-extern int datafile_argv, change_to_game_dir, force_window;
+extern int datafile_argv, change_to_game_dir, force_window, force_background_run;
 extern int override_start_room, force_16bit;
 extern bool justRegisterGame;
 extern bool justUnRegisterGame;

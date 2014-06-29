@@ -24,6 +24,7 @@ GameSetup::GameSetup()
     want_letterbox = false;
     windowed = false;
     no_speech_pack = false;
+    background_run = false;
     refresh = 0;
     enable_antialiasing = false;
     force_hicolor_mode = false;

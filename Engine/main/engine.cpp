@@ -202,13 +202,16 @@ int engine_check_run_setup(int argc,char*argv[])
     return RETURN_CONTINUE;
 }
 
-void engine_force_window()
+static void engine_force_options()
 {
     // Force to run in a window, override the config file
     if (force_window == 1)
         usetup.windowed = true;
     else if (force_window == 2)
         usetup.windowed = false;
+    // Force background running, override the config file
+    if (force_background_run)
+        usetup.background_run = true;
 }
 
 void init_game_file_name_from_cmdline()
@@ -1323,7 +1326,7 @@ int initialize_engine(int argc,char*argv[])
         return res;
     }
 
-    engine_force_window();
+    engine_force_options();
 
     our_eip = -195;
 
@@ -1443,7 +1446,7 @@ int initialize_engine(int argc,char*argv[])
         return res;
     }
 
-    SetMultitasking(0);
+    SetMultitasking(usetup.background_run);
 
     engine_show_preload();
 
