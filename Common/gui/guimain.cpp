@@ -114,6 +114,7 @@ void GUIMain::WriteToFile(Stream *out)
 
   // array of dummy 32-bit pointers
   int32_t dummy_arr[MAX_OBJS_ON_GUI];
+  memset(&dummy_arr, 0, sizeof (dummy_arr));
   out->WriteArrayOfInt32(dummy_arr, MAX_OBJS_ON_GUI);
 
   out->WriteArrayOfInt32((int32_t*)&objrefptr, MAX_OBJS_ON_GUI);

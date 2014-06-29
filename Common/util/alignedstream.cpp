@@ -16,6 +16,8 @@
 #include "util/stream.h"
 #include "util/math.h"
 
+#include <string.h>
+
 namespace AGS
 {
 namespace Common
@@ -350,6 +352,7 @@ void AlignedStream::WritePadding(size_t next_type)
         // Write padding only if have to
         if (pad)
         {
+            memset(_paddingBuffer, 0, next_type - pad);
             _stream->Write(_paddingBuffer, next_type - pad);
             _block += next_type - pad;
         }
